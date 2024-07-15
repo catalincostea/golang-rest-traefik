@@ -1,0 +1,41 @@
+# FROM golang:1.21
+
+# Use an official Go image as the base image
+FROM golang:1.18-alpine as builder
+
+# Install Terraform
+RUN apk add --no-cache \
+    curl \
+    bash \
+    git \
+    unzip && \
+    curl -fsSL https://releases.hashicorp.com/terraform/1.1.9/terraform_1.1.9_linux_amd64.zip -o terraform.zip && \
+    unzip terraform.zip && \
+    mv terraform /usr/local/bin/ && \
+    rm terraform.zip
+
+# Set the working directory
+WORKDIR /app
+
+# Copy the current directory contents into the container
+COPY . .
+
+# Build the Go app
+RUN go mod tidy
+RUN go build -o main .
+
+# Use a smaller base image to run the built application
+FROM alpine:latest
+
+# Install bash
+RUN apk add --no-cache bash
+
+# Copy the built Go binary and Terraform from the builder stage
+COPY --from=builder /usr/local/bin/terraform /usr/local/bin/terraform
+COPY --from=builder /app/main /usr/local/bin/main
+
+# Set the working directory
+WORKDIR /app
+
+# Mount the current directory and run bash
+ENTRYPOINT ["/bin/bash"]
